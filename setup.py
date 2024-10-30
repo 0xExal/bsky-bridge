@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="bsky-bridge",
-    version="1.0.2",
+    version="1.0.3",
     description="A Python interface for interacting with the BlueSky social network's API.",
     long_description=open("README.md", "r").read(),
     long_description_content_type="text/markdown",
@@ -13,6 +13,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         "requests",
+        "Pillow",
     ],
     classifiers=[
         "Programming Language :: Python :: 3",

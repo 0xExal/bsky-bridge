@@ -1,7 +1,7 @@
 from datetime import datetime
 import os
 import logging 
-import imghdr
+from PIL import Image
 from .image_utilities import resize_image, MAX_IMAGE_SIZE
 
 
@@ -34,14 +34,13 @@ def post_text(session, text):
     return session.api_call(endpoint, method='POST', json=json_payload)
 
 
-def send_image(session, image_path, image_mimetype):
+def send_image(session, image_path):
     """
     Uploads an image to BlueSky and returns the blob metadata.
 
     Args:
         session (BskySession): Authenticated session instance.
         image_path (str): Path to the image to be uploaded.
-        image_mimetype (str): Mimetype of the image (e.g. "image/png").
 
     Returns:
         dict: Blob metadata.
@@ -54,7 +53,9 @@ def send_image(session, image_path, image_mimetype):
         raise FileNotFoundError(f"{image_path} not found.")
     
     img_bytes = resize_image(image_path)
-    image_mimetype = f"image/{imghdr.what(None, img_bytes)}"
+    
+    with Image.open(image_path) as img:
+        image_mimetype = img.get_format_mimetype()
 
     if len(img_bytes) > MAX_IMAGE_SIZE:
         raise ValueError(
@@ -63,11 +64,10 @@ def send_image(session, image_path, image_mimetype):
         )
 
     endpoint = "com.atproto.repo.uploadBlob"
-
     headers = {"Content-Type": image_mimetype, "Authorization": f"Bearer {session.access_token}"}
+    
     try:
         resp = session.api_call(endpoint, method='POST', data=img_bytes, headers=headers)
-
         return resp["blob"]
     except Exception as e:
         logging.error("Error uploading image: %s", e)
@@ -90,8 +90,7 @@ def post_image(session, post_text, image_path, alt_text=""):
     Raises:
         requests.RequestException: If there's an issue posting the image.
     """
-    image_mimetype = f"image/{imghdr.what(image_path)}"
-    blob = send_image(session, image_path, image_mimetype)
+    blob = send_image(session, image_path)
 
     now = datetime.now().astimezone().isoformat()
     post_data = {
