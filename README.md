@@ -41,7 +41,9 @@
   After initializing a session, you can post text to BlueSky:
 
   ```python
-  from bsky_bridge import post_text
+  from bsky_bridge import BskySession, post_text
+
+  session = BskySession("your_handle.bsky.social", "your_APPpassword")
 
   response = post_text(session, "Hello BlueSky!")
   print(response)
@@ -52,7 +54,9 @@
   To post images along with text, you can use the `post_image` method:
 
   ```python
-  from bsky_bridge import post_image
+  from bsky_bridge import BskySession, post_image
+
+  session = BskySession("your_handle.bsky.social", "your_APPpassword")
 
   postText = "Check out this cool image!"
   imagePath = "path_to_your_image.jpeg"
