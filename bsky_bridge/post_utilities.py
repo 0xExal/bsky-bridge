@@ -60,8 +60,8 @@ def parse_tags(text: str) -> list[dict]:
         list[dict]: A list of dictionaries, each containing the byte start, byte end positions, and the tag.
     """
     spans = []
-    # regex for handles based on Bluesky spec
-    tag_regex = rb"[$|\W](#[a-zA-Z0-9]+)"
+    # regex for hashtags
+    tag_regex = rb"[$|\W](#[a-zA-Z0-9_]+)"
     text_bytes = text.encode("UTF-8")
     for m in re.finditer(tag_regex, text_bytes):
         spans.append({
