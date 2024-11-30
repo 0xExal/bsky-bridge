@@ -178,11 +178,9 @@ def post_image(session, post_text, image_path, alt_text=""):
     Returns:
         dict: The response from the API after posting the image and text.
     """
-    blob = send_image(session, image_path)
+    blob, aspect_ratio = send_image(session, image_path)
     now = datetime.now().astimezone().isoformat()
-    
     facets = create_facets(post_text, session)
-    
     post_data = {
         "$type": "app.bsky.feed.post",
         "text": post_text,
@@ -191,7 +189,8 @@ def post_image(session, post_text, image_path, alt_text=""):
             "$type": "app.bsky.embed.images",
             "images": [{
                 "alt": alt_text,
-                "image": blob
+                "image": blob,
+                "aspectRatio": aspect_ratio
             }],
         },
     }
@@ -230,6 +229,10 @@ def send_image(session, image_path):
     img_bytes = resize_image(image_path)
     with Image.open(image_path) as img:
         image_mimetype = img.get_format_mimetype()
+        aspect_ratio = {
+            "width": img.width,
+            "height": img.height
+        }
 
     if len(img_bytes) > MAX_IMAGE_SIZE:
         raise ValueError(
@@ -242,7 +245,7 @@ def send_image(session, image_path):
     
     try:
         resp = session.api_call(endpoint, method='POST', data=img_bytes, headers=headers)
-        return resp["blob"]
+        return resp["blob"], aspect_ratio
     except Exception as e:
         logging.error("Error uploading image: %s", e)
         raise
