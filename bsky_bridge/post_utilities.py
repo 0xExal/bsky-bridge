@@ -132,13 +132,15 @@ def create_facets(text: str, session) -> list[dict]:
 
     return facets
 
-def post_text(session, text: str):
+def post_text(session, text: str, langs: list = None):
     """
     Posts a text message to BlueSky, including support for mentions, links, and hashtags.
+    Optionally includes language information if 'langs' is provided.
 
     Args:
         session: The session object used to interact with the BlueSky API.
         text (str): The text message to post.
+        langs (list, optional): List of language codes to specify manually. If None, the 'langs' field is omitted.
 
     Returns:
         dict: The response from the API after posting the text message.
@@ -154,6 +156,9 @@ def post_text(session, text: str):
         "createdAt": now,
     }
     
+    if langs:
+        post_data["langs"] = langs
+    
     if facets:
         post_data["facets"] = facets
 
@@ -165,15 +170,18 @@ def post_text(session, text: str):
     
     return session.api_call(endpoint, method='POST', json=json_payload)
 
-def post_image(session, post_text, image_path, alt_text=""):
+
+def post_image(session, post_text: str, image_path: str, alt_text: str = "", langs: list = None):
     """
-    Posts an image to BlueSky with text support for mentions, links, and hashtags.
+    Posts an image to BlueSky with accompanying text, including support for mentions, links, and hashtags.
+    Optionally includes language information if 'langs' is provided.
 
     Args:
         session: The session object used to interact with the BlueSky API.
         post_text (str): The text message to post with the image.
         image_path (str): The local path to the image file to upload.
         alt_text (str, optional): The alt text for the image.
+        langs (list, optional): List of language codes to specify manually. If None, the 'langs' field is omitted.
 
     Returns:
         dict: The response from the API after posting the image and text.
@@ -181,6 +189,7 @@ def post_image(session, post_text, image_path, alt_text=""):
     blob, aspect_ratio = send_image(session, image_path)
     now = datetime.now().astimezone().isoformat()
     facets = create_facets(post_text, session)
+    
     post_data = {
         "$type": "app.bsky.feed.post",
         "text": post_text,
@@ -194,6 +203,9 @@ def post_image(session, post_text, image_path, alt_text=""):
             }],
         },
     }
+    
+    if langs:
+        post_data["langs"] = langs
     
     if facets:
         post_data["facets"] = facets
