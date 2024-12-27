@@ -6,7 +6,7 @@ from typing import Optional
 
 class BskySession:
     """
-    Represents a session with the BlueSky social network. 
+    Represents a session with the BlueSky social network.
     The session handles authentication, token refreshing, and provides methods for making authenticated requests.
     
     Attributes:
@@ -51,7 +51,7 @@ class BskySession:
             resp = requests.post(url, json=payload, timeout=10)
             resp.raise_for_status()
         except requests.RequestException as e:
-            logging.error("Error %s: %s", resp.status_code if 'resp' in locals() else 'No Response', resp.text if 'resp' in locals() else str(e))
+            logging.error("Error %s: %s", getattr(resp, 'status_code', 'No Response'), getattr(resp, 'text', str(e)))
             raise ConnectionError(f"Error creating session: {str(e)}") from e
 
         session = resp.json()
@@ -59,6 +59,7 @@ class BskySession:
         self.refresh_token = session.get("refreshJwt")
         self.did = session["did"]
         self._save_session()
+        logging.info("New session created.")
 
     def _refresh_access_token(self):
         """
@@ -77,7 +78,7 @@ class BskySession:
             resp = requests.post(url, json=payload, timeout=10)
             resp.raise_for_status()
         except requests.RequestException as e:
-            logging.error("Error %s: %s", resp.status_code if 'resp' in locals() else 'No Response', resp.text if 'resp' in locals() else str(e))
+            logging.error("Error %s: %s", getattr(resp, 'status_code', 'No Response'), getattr(resp, 'text', str(e)))
             raise ConnectionError(f"Error refreshing session: {str(e)}") from e
 
         session = resp.json()
@@ -104,6 +105,8 @@ class BskySession:
                     logging.info("Session loaded from file.")
             except (IOError, json.JSONDecodeError) as e:
                 logging.warning("Failed to load session file: %s", e)
+                logging.info("Creating a new session.")
+                self._create_session()
         else:
             logging.info("No existing session file found. Creating a new session.")
             self._create_session()
@@ -137,7 +140,7 @@ class BskySession:
         """
         return {"Authorization": f"Bearer {self.access_token}"}
 
-    def api_call(self, endpoint: str, method: str = 'GET', json: Optional[dict] = None, data: Optional[bytes] = None, headers: Optional[dict] = None, params: Optional[dict] = None) -> dict:
+    def api_call(self, endpoint: str, method: str = 'GET', json: Optional[dict] = None, data: Optional[bytes] = None, headers: Optional[dict] = None, params: Optional[dict] = None, retry: int = 1) -> dict:
         """
         Makes an authenticated API call to the specified endpoint.
 
@@ -148,6 +151,7 @@ class BskySession:
             data (bytes, optional): The data to send with the request.
             headers (dict, optional): Additional headers to send with the request.
             params (dict, optional): Parameters to include in the query string.
+            retry (int): Number of retry attempts left.
 
         Returns:
             dict: The server's response as a dictionary.
@@ -162,32 +166,20 @@ class BskySession:
         
         try:
             resp = requests.request(method, url, headers=headers, json=json, data=data, timeout=10)
-            
-            needs_refresh = False
-
-            if resp.status_code == 401:
-                logging.info("Access token expired (401). Attempting to refresh.")
-                needs_refresh = True
-            elif resp.status_code == 400:
+            if resp.status_code in [401, 400] and retry > 0:
+                logging.info("Token potentially expired or invalid. Attempting to refresh.")
                 try:
-                    error_response = resp.json()
-                    error_message = error_response.get('error', '').lower()
-                    if 'token' in error_message or 'authentication' in error_message:
-                        logging.info("Access token may be expired or invalid (400). Attempting to refresh.")
-                        needs_refresh = True
-                except json.JSONDecodeError:
-                    logging.warning("Failed to decode error response for status 400.")
-            
-            if needs_refresh and self.refresh_token:
-                self._refresh_access_token()
+                    self._refresh_access_token()
+                except ConnectionError as e:
+                    logging.error("Failed to refresh token: %s", e)
+                    logging.info("Creating a new session.")
+                    self._create_session()
                 headers.update(self.get_auth_header())
-                resp = requests.request(method, url, headers=headers, json=json, data=data, timeout=10)
-            
+                return self.api_call(endpoint, method, json, data, headers, params, retry=retry-1)
             resp.raise_for_status()
             return resp.json()
-        
         except requests.RequestException as e:
-            logging.error("Error in API call: %s", e)
+            logging.error("Error during API call: %s", e)
             raise
 
     def logout(self):
