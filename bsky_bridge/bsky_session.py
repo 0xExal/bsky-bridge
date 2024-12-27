@@ -162,13 +162,30 @@ class BskySession:
         
         try:
             resp = requests.request(method, url, headers=headers, json=json, data=data, timeout=10)
-            if resp.status_code == 401 and self.refresh_token:
-                logging.info("Access token expired. Attempting to refresh.")
+            
+            needs_refresh = False
+
+            if resp.status_code == 401:
+                logging.info("Access token expired (401). Attempting to refresh.")
+                needs_refresh = True
+            elif resp.status_code == 400:
+                try:
+                    error_response = resp.json()
+                    error_message = error_response.get('error', '').lower()
+                    if 'token' in error_message or 'authentication' in error_message:
+                        logging.info("Access token may be expired or invalid (400). Attempting to refresh.")
+                        needs_refresh = True
+                except json.JSONDecodeError:
+                    logging.warning("Failed to decode error response for status 400.")
+            
+            if needs_refresh and self.refresh_token:
                 self._refresh_access_token()
                 headers.update(self.get_auth_header())
                 resp = requests.request(method, url, headers=headers, json=json, data=data, timeout=10)
+            
             resp.raise_for_status()
             return resp.json()
+        
         except requests.RequestException as e:
             logging.error("Error in API call: %s", e)
             raise
