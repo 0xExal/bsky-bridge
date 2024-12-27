@@ -19,6 +19,7 @@
   - Easy authentication with the BlueSky API.
   - Functions to post text and images to BlueSky via the API.
   - Parser to identify and extract mentions (@handle), links (URLs), and hashtags (#tags) from text, useful for processing and formatting posts.
+  - Session persistence and automatic token refresh to handle authentication efficiently and prevent rate limiting.
   - Optional Language Specification: Users can manually specify the languages of their posts using the langs parameter to enhance filtering and parsing capabilities.
 
   ## Installation
