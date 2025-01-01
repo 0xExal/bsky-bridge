@@ -61,14 +61,18 @@ def parse_tags(text: str) -> list[dict]:
     """
     spans = []
     # regex for hashtags
-    tag_regex = rb"[$|\W](#[a-zA-Z0-9_]+)"
-    text_bytes = text.encode("UTF-8")
-    for m in re.finditer(tag_regex, text_bytes):
+    tag_regex = r"(?<!\w)(#[\w]+)"
+    
+    for match in re.finditer(tag_regex, text, re.UNICODE):
+        tag = match.group(1)
+        byte_start = len(text[:match.start(1)].encode('utf-8'))
+        byte_end = byte_start + len(tag.encode('utf-8'))
         spans.append({
-            "start": m.start(1),
-            "end": m.end(1),
-            "tag": m.group(1)[1:].decode("UTF-8")
+            "start": byte_start,
+            "end": byte_end,
+            "tag": tag[1:]
         })
+    
     return spans
 
 def create_facets(text: str, session) -> list[dict]:
