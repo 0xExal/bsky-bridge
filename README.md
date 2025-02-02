@@ -43,7 +43,7 @@
   ```python
   from bsky_bridge import BskySession
 
-  session = BskySession("your_handle.bsky.social", "your_APPpassword", session_dir="/custom/path/to/sessions")
+  session = BskySession("your_handle.bsky.social", "your_APPpassword", "/custom/path/to/sessions")
   ```
 
   ### Posting Content
