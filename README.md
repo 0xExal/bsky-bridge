@@ -32,12 +32,18 @@
 
   ### Creating a Session
 
-  Start by establishing a session with your BlueSky handle and **App passwords** *(To be created in your account settings)*:
-
+  Start by establishing a session with your BlueSky handle and App passwords (To be created in your account settings).
   ```python
   from bsky_bridge import BskySession
 
   session = BskySession("your_handle.bsky.social", "your_APPpassword")
+  ```
+
+  You can also specify a custom directory for storing the session file (By default it will be ".bsky_sessions" in the current directory).
+  ```python
+  from bsky_bridge import BskySession
+
+  session = BskySession("your_handle.bsky.social", "your_APPpassword", session_dir="/custom/path/to/sessions")
   ```
 
   ### Posting Content

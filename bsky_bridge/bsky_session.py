@@ -3,6 +3,7 @@ import requests
 import os
 import json
 from typing import Optional
+import time
 
 class BskySession:
     """
@@ -19,9 +20,8 @@ class BskySession:
     """
     
     BASE_URL = "https://bsky.social/xrpc"
-    SESSION_FILE = 'session.json'  # Path to store session tokens
 
-    def __init__(self, handle: str, app_password: str, session_file: Optional[str] = None):
+    def __init__(self, handle: str, app_password: str, session_dir: Optional[str] = None):
         """
         Initializes a BlueSky session.
 
@@ -32,7 +32,13 @@ class BskySession:
         """
         self.handle = handle
         self.app_password = app_password
-        self.session_file = session_file or self.SESSION_FILE
+        
+        # Create sessions directory in current working directory
+        sessions_dir = session_dir or os.path.join(os.getcwd(), '.bsky_sessions')
+        os.makedirs(sessions_dir, exist_ok=True)
+        
+        self.session_file = os.path.join(sessions_dir, f'{handle}_session.json')
+        
         self.access_token = None
         self.refresh_token = None
         self.did = None
@@ -50,36 +56,42 @@ class BskySession:
         try:
             resp = requests.post(url, json=payload, timeout=10)
             resp.raise_for_status()
+            session = resp.json()
+            self.access_token = session["accessJwt"]
+            self.refresh_token = session.get("refreshJwt")
+            self.did = session["did"]
+            
+            self._save_session()
+            logging.info(f"New session created for {self.handle}")
+        
         except requests.RequestException as e:
-            logging.error("Error %s: %s", getattr(resp, 'status_code', 'No Response'), getattr(resp, 'text', str(e)))
-            raise ConnectionError(f"Error creating session: {str(e)}") from e
-
-        session = resp.json()
-        self.access_token = session["accessJwt"]
-        self.refresh_token = session.get("refreshJwt")
-        self.did = session["did"]
-        self._save_session()
-        logging.info("New session created.")
+            logging.error(f"Session creation failed: {e}")
+            raise ConnectionError(f"Error creating session: {e}")
 
     def _refresh_access_token(self):
         """
         Refreshes the access token using the refresh token.
+        If refresh fails, initiates a new authentication session.
 
         Returns:
             None
         """
-        if not self.refresh_token:
-            logging.error("No refresh token available.")
-            raise ValueError("Refresh token is missing.")
-
         url = f"{self.BASE_URL}/com.atproto.server.refreshSession"
-        payload = {"refreshToken": self.refresh_token}
+        headers = {"Authorization": f"Bearer {self.refresh_token}"}
         try:
-            resp = requests.post(url, json=payload, timeout=10)
+            resp = requests.post(url, headers=headers, timeout=10)
+            
+            if resp.status_code == 401:
+                logging.warning("Refresh token is no longer valid. Creating new session.")
+                self._create_session()
+                return
+            
             resp.raise_for_status()
         except requests.RequestException as e:
             logging.error("Error %s: %s", getattr(resp, 'status_code', 'No Response'), getattr(resp, 'text', str(e)))
-            raise ConnectionError(f"Error refreshing session: {str(e)}") from e
+            logging.warning("Failed to refresh token. Creating new session.")
+            self._create_session()
+            return
 
         session = resp.json()
         self.access_token = session["accessJwt"]
@@ -99,16 +111,24 @@ class BskySession:
             try:
                 with open(self.session_file, 'r') as f:
                     session = json.load(f)
-                    self.access_token = session.get("accessJwt")
-                    self.refresh_token = session.get("refreshJwt")
-                    self.did = session.get("did")
-                    logging.info("Session loaded from file.")
+                
+                # Validate session data
+                if not all(session.get(key) for key in ["accessJwt", "refreshJwt", "did"]):
+                    logging.warning("Incomplete session data. Creating new session.")
+                    self._create_session()
+                    return
+                
+                self.access_token = session["accessJwt"]
+                self.refresh_token = session["refreshJwt"]
+                self.did = session["did"]
+                
+                logging.info(f"Session loaded for {self.handle}")
+            
             except (IOError, json.JSONDecodeError) as e:
-                logging.warning("Failed to load session file: %s", e)
-                logging.info("Creating a new session.")
+                logging.warning(f"Session load failed: {e}")
                 self._create_session()
         else:
-            logging.info("No existing session file found. Creating a new session.")
+            logging.info(f"No session found for {self.handle}. Creating new session.")
             self._create_session()
 
     def _save_session(self):
@@ -118,17 +138,20 @@ class BskySession:
         Returns:
             None
         """
-        session = {
+        session_data = {
             "accessJwt": self.access_token,
             "refreshJwt": self.refresh_token,
-            "did": self.did
+            "did": self.did,
+            "created_at": time.time()
         }
+        
         try:
             with open(self.session_file, 'w') as f:
-                json.dump(session, f)
-            logging.info("Session saved to file.")
+                json.dump(session_data, f)
+            logging.info(f"Session saved for {self.handle}")
+        
         except IOError as e:
-            logging.error("Failed to save session file: %s", e)
+            logging.error(f"Session save failed: {e}")
             raise
 
     def get_auth_header(self) -> dict:

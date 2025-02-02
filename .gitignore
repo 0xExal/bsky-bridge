@@ -170,4 +170,5 @@ poetry.toml
 # LSP config files
 pyrightconfig.json
 
-session.json
+# bsky-bridge sessions folder
+.bsky_sessions
