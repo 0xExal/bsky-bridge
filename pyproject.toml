@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bsky-bridge"
+version = "1.1.0"
+description = "A Python library for the BlueSky Social Network API"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Exal", email = "hello@exal.sh"}
+]
+keywords = [
+    "bluesky",
+    "atproto",
+    "api",
+    "social-network",
+    "python",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Developers",
+    "Topic :: Internet",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+requires-python = ">=3.9"
+dependencies = [
+    "requests",
+    "Pillow",
+]
+
+[project.urls]
+Homepage = "https://github.com/0xExal/bsky-bridge"
+Repository = "https://github.com/0xExal/bsky-bridge"
+Issues = "https://github.com/0xExal/bsky-bridge/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
