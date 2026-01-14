@@ -4,6 +4,7 @@ import os
 import json
 from typing import Optional
 import time
+from urllib.parse import urlencode
 
 class BskySession:
     """
@@ -163,7 +164,7 @@ class BskySession:
         """
         return {"Authorization": f"Bearer {self.access_token}"}
 
-    def api_call(self, endpoint: str, method: str = 'GET', json: Optional[dict] = None, data: Optional[bytes] = None, headers: Optional[dict] = None, params: Optional[dict] = None, retry: int = 1) -> dict:
+    def api_call(self, endpoint: str, method: str = 'GET', json: Optional[dict] = None, data: Optional[bytes] = None, headers: Optional[dict] = None, params: Optional[dict] = None, retry: int = 1, rate_limit_retry: int = 3) -> dict:
         """
         Makes an authenticated API call to the specified endpoint.
 
@@ -174,21 +175,29 @@ class BskySession:
             data (bytes, optional): The data to send with the request.
             headers (dict, optional): Additional headers to send with the request.
             params (dict, optional): Parameters to include in the query string.
-            retry (int): Number of retry attempts left.
+            retry (int): Number of retry attempts left for auth errors.
+            rate_limit_retry (int): Number of retry attempts left for rate limiting.
 
         Returns:
             dict: The server's response as a dictionary.
         """
         url = f"{self.BASE_URL}/{endpoint}"
         if params:
-            from urllib.parse import urlencode
             url = f"{url}?{urlencode(params)}"
-        
+
         headers = headers or {}
         headers.update(self.get_auth_header())
-        
+
         try:
             resp = requests.request(method, url, headers=headers, json=json, data=data, timeout=10)
+
+            # Handle rate limiting (429)
+            if resp.status_code == 429 and rate_limit_retry > 0:
+                retry_after = self._get_retry_after(resp, rate_limit_retry)
+                logging.warning(f"Rate limited. Waiting {retry_after} seconds before retry.")
+                time.sleep(retry_after)
+                return self.api_call(endpoint, method, json, data, headers, params, retry=retry, rate_limit_retry=rate_limit_retry-1)
+
             if resp.status_code in [401, 400] and retry > 0:
                 logging.info("Token potentially expired or invalid. Attempting to refresh.")
                 try:
@@ -198,12 +207,48 @@ class BskySession:
                     logging.info("Creating a new session.")
                     self._create_session()
                 headers.update(self.get_auth_header())
-                return self.api_call(endpoint, method, json, data, headers, params, retry=retry-1)
+                return self.api_call(endpoint, method, json, data, headers, params, retry=retry-1, rate_limit_retry=rate_limit_retry)
             resp.raise_for_status()
             return resp.json()
         except requests.RequestException as e:
             logging.error("Error during API call: %s", e)
             raise
+
+    def _get_retry_after(self, response: requests.Response, retry_count: int) -> float:
+        """
+        Calculates the wait time before retrying after a rate limit.
+        Uses the Retry-After or RateLimit-Reset header if available,
+        otherwise uses exponential backoff.
+
+        Args:
+            response: The HTTP response object.
+            retry_count: Current retry count (for exponential backoff).
+
+        Returns:
+            float: Number of seconds to wait.
+        """
+        # Try Retry-After header first
+        retry_after = response.headers.get('Retry-After')
+        if retry_after:
+            try:
+                return float(retry_after)
+            except ValueError:
+                pass
+
+        # Try RateLimit-Reset header (Unix timestamp)
+        reset_time = response.headers.get('RateLimit-Reset')
+        if reset_time:
+            try:
+                wait_time = float(reset_time) - time.time()
+                if wait_time > 0:
+                    return min(wait_time, 300)  # Cap at 5 minutes
+            except ValueError:
+                pass
+
+        # Fallback to exponential backoff: 1s, 2s, 4s...
+        base_delay = 1
+        max_delay = 60
+        return min(base_delay * (2 ** (3 - retry_count)), max_delay)
 
     def logout(self):
         """

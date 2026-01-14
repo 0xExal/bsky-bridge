@@ -9,4 +9,4 @@ Modules:
 """
 
 from .bsky_session import BskySession
-from .post_utilities import post_text, post_image
+from .post_utilities import post_text, post_image, post_images, set_threadgate
