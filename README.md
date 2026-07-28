@@ -5,6 +5,8 @@ A Python library for the BlueSky Social Network API.
 [![PyPI version](https://badge.fury.io/py/bsky-bridge.svg)](https://pypi.org/project/bsky-bridge/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+English | [Español](README.es-ES.md)
+
 ## Features
 
 - Simple authentication with automatic session persistence
